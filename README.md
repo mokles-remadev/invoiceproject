@@ -10,6 +10,7 @@ A comprehensive React-based system for creating, managing, and tracking invoices
 - [Project Structure](#project-structure)
 - [Technical Stack](#technical-stack)
 - [Setup and Installation](#setup-and-installation)
+- [ERP Integration Guide](#erp-integration-guide)
 - [Usage Guide](#usage-guide)
 - [Known Issues](#known-issues)
 - [Future Enhancements](#future-enhancements)
@@ -124,6 +125,231 @@ npm run build
 ```
 
 This will generate optimized production files in the `dist` directory.
+
+## ERP Integration Guide
+
+### Overview
+This module can be integrated into your existing ERP system as an invoice management component. Instead of using React Context for state management, we'll implement a service-based architecture with RESTful APIs.
+
+### Integration Steps
+
+1. **Module Installation**
+
+   Add the invoice module to your ERP project:
+   ```bash
+   # From your ERP project root
+   npm install --save ./path/to/invoicemokles
+   ```
+   
+   Or add it as a Git submodule:
+   ```bash
+   git submodule add <repository-url> modules/invoicemokles
+   ```
+
+2. **API Implementation**
+
+   Create an API service layer in your ERP project that will replace the InvoiceContext:
+
+   ```javascript
+   // /api/invoiceService.js
+   
+   // Example API implementation with fetch or axios
+   export const invoiceService = {
+     // Fetch all invoices with optional filtering
+     getInvoices: async (filters = {}) => {
+       const queryParams = new URLSearchParams(filters).toString();
+       const response = await fetch(`/api/invoices?${queryParams}`);
+       return response.json();
+     },
+     
+     // Get a single invoice by ID
+     getInvoiceById: async (id) => {
+       const response = await fetch(`/api/invoices/${id}`);
+       return response.json();
+     },
+     
+     // Create a new invoice
+     createInvoice: async (invoice) => {
+       const response = await fetch('/api/invoices', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify(invoice)
+       });
+       return response.json();
+     },
+     
+     // Update an existing invoice
+     updateInvoice: async (invoice) => {
+       const response = await fetch(`/api/invoices/${invoice.id}`, {
+         method: 'PUT',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify(invoice)
+       });
+       return response.json();
+     },
+     
+     // Delete an invoice
+     deleteInvoice: async (id) => {
+       await fetch(`/api/invoices/${id}`, {
+         method: 'DELETE'
+       });
+     },
+     
+     // Record payment for an invoice
+     recordPayment: async (invoiceId, payment) => {
+       const response = await fetch(`/api/invoices/${invoiceId}/payments`, {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify(payment)
+       });
+       return response.json();
+     }
+   };
+   ```
+
+3. **Component Modification**
+
+   Modify the invoice components to use the API service instead of the InvoiceContext:
+
+   ```javascript
+   // Example modification for InvoiceList.jsx
+   import React, { useState, useEffect } from 'react';
+   import { invoiceService } from '../../api/invoiceService';
+   
+   const InvoiceList = () => {
+     const [invoices, setInvoices] = useState([]);
+     const [loading, setLoading] = useState(false);
+     const [error, setError] = useState(null);
+     
+     useEffect(() => {
+       fetchInvoices();
+     }, []);
+     
+     const fetchInvoices = async () => {
+       try {
+         setLoading(true);
+         const data = await invoiceService.getInvoices();
+         setInvoices(data);
+       } catch (err) {
+         setError('Failed to fetch invoices');
+         console.error(err);
+       } finally {
+         setLoading(false);
+       }
+     };
+     
+     // Rest of component implementation...
+   };
+   ```
+
+4. **Backend API Endpoints**
+
+   Implement the following API endpoints in your ERP backend system:
+
+   - `GET /api/invoices` - List all invoices with filtering options
+   - `GET /api/invoices/:id` - Get a specific invoice
+   - `POST /api/invoices` - Create a new invoice
+   - `PUT /api/invoices/:id` - Update an existing invoice
+   - `DELETE /api/invoices/:id` - Delete an invoice
+   - `POST /api/invoices/:id/payments` - Record a payment for an invoice
+   - `GET /api/clients` - List all clients
+   - `GET /api/projects` - List all projects
+   - `GET /api/companies` - List all companies
+
+5. **Database Schema**
+
+   Ensure your ERP database includes the following tables:
+
+   - `invoices`: Invoice header information
+   - `invoice_line_items`: Line items for each invoice
+   - `payments`: Payment records
+   - `clients`: Client information
+   - `projects`: Project details
+   - `companies`: Company information
+
+6. **Calculation Utilities**
+
+   The existing calculation utilities (`calculations.js`) can be reused in your backend to ensure consistent calculations:
+
+   ```javascript
+   // Server-side implementation example
+   const { recalculateInvoice } = require('./path/to/calculations');
+   
+   app.post('/api/invoices', (req, res) => {
+     const invoiceData = req.body;
+     // Apply calculations
+     const processedInvoice = recalculateInvoice(invoiceData);
+     // Save to database
+     db.invoices.create(processedInvoice)
+       .then(result => res.json(result))
+       .catch(err => res.status(500).json({ error: err.message }));
+   });
+   ```
+
+7. **UI Integration**
+
+   Integrate the invoice module UI into your ERP navigation:
+
+   ```javascript
+   // Example for React Router integration
+   import { InvoicePage } from 'invoicemokles/src/pages/InvoicePage';
+   
+   // In your ERP routes configuration
+   <Route path="/invoices/*" element={<InvoicePage />} />
+   ```
+
+### Data Exchange Format
+
+The invoice object should conform to the following structure:
+
+```javascript
+{
+  id: String,
+  invoiceNumber: String,
+  date: String, // YYYY-MM-DD format
+  dueDate: String, // YYYY-MM-DD format
+  companyId: String,
+  clientId: String,
+  projectId: String,
+  status: String, // "Draft", "Sent", "Paid", "Overdue", etc.
+  totalAmount: Number,
+  progressPercentage: Number,
+  currentInvoiceAmount: Number,
+  lineItems: [
+    {
+      id: String,
+      description: String,
+      amount: Number,
+      deductionPercentage: Number,
+      deductionAmount: Number,
+      retentionPercentage: Number,
+      retentionAmount: Number,
+      netAmount: Number
+    }
+  ],
+  payments: Array<String>, // Array of payment IDs
+  deductions: Number,
+  retentions: Number,
+  advancePayment: Number,
+  remainingBalance: Number,
+  notes: String,
+  documents: Array
+}
+```
+
+### Security Considerations
+
+- Implement proper authentication and authorization
+- Validate all user inputs both client and server side
+- Use HTTPS for all API communications
+- Implement rate limiting to prevent abuse
+- Add audit logging for sensitive operations
+
+### Performance Optimization
+
+- Implement pagination for invoice listings
+- Use caching for frequently accessed data
+- Consider implementing GraphQL for more efficient data fetching
 
 ## Usage Guide
 
