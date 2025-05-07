@@ -80,7 +80,7 @@ export const clients = [
 export const projects = [
   {
     id: '1',
-    name: 'E-commerce Platform Redesign',
+    name: 'E-commerce Platform Redesign E-commerce Platform Redesign E-commerce Platform Redesign',
     clientId: '2',
     totalAmount: 120000,
     startDate: '2023-01-15',

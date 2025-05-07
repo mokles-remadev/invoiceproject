@@ -13,39 +13,40 @@ export const generateInvoicePDF = (invoice) => {
     throw new Error('Company, client, or project data not found');
   }
 
-  // Create PDF with A4 format and professional font
-  const pdf = new jsPDF({
-    format: 'a4',
-    unit: 'mm'
-  });
-  
-  pdf.setFont('helvetica');
+  // Create PDF with A4 format and a professional font
+  const pdf = new jsPDF({ format: 'a4', unit: 'mm' });
+  pdf.setFont('Times');
 
-  // Professional color scheme
-  const colors = {
-    primary: [0, 32, 96],
-    secondary: [102, 102, 102],
-    accent: [0, 112, 192],
-    success: [0, 176, 80],
-    warning: [255, 192, 0],
-    danger: [192, 0, 0],
-    border: [220, 220, 220]
-  };
-
-  // A4 dimensions
+  // Define constant values for layout
   const pageWidth = 210;
   const pageHeight = 297;
   const margin = 20;
 
-  // Header section with improved layout
-  pdf.setFillColor(...colors.primary);
-  pdf.rect(margin, margin, 50, 20, 'F');
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(14);
-  pdf.text(company.name.substring(0, 10), margin + 25, margin + 12, { align: 'center' });
+  // Define a consistent color palette (all valid RGB arrays)
+  const colors = {
+    primary: [0, 32, 96],
+    secondary: [102, 102, 102],
+    accent: [0, 112, 192],
+    border: [220, 220, 220],
+    lightGray: [245, 245, 245]
+  };
 
-  // Company details with registration numbers
-  pdf.setTextColor(...colors.secondary);
+  const safeColor = (color) =>
+    Array.isArray(color) && color.length === 3 ? color : [0, 0, 0];
+
+  // ------------------------------------------------
+  // Header Section (Company Logo/Name & Details)
+  // ------------------------------------------------
+  // Left side: Company Logo/Name in a colored rectangle
+  const logoWidth = 50;
+  const logoHeight = 20;
+  pdf.setFillColor(...safeColor(colors.primary));
+  pdf.rect(margin, margin, logoWidth, logoHeight, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(16);
+  pdf.text(company.name.substring(0, 15), margin + logoWidth / 2, margin + logoHeight / 2 + 4, { align: 'center' });
+
+  // Right side: Company Details aligned to top-right
   pdf.setFontSize(9);
   const companyDetails = [
     company.name,
@@ -55,62 +56,71 @@ export const generateInvoicePDF = (invoice) => {
     `Reg No: ${company.id}`,
     `VAT No: ${company.id}`
   ];
-  
   companyDetails.forEach((detail, index) => {
+    pdf.setTextColor(...safeColor(colors.secondary));
     pdf.text(detail, pageWidth - margin, margin + (index * 5), { align: 'right' });
   });
 
-  // Invoice title and reference numbers
-  pdf.setTextColor(...colors.primary);
+  // ------------------------------------------------
+  // Invoice Title Section
+  // ------------------------------------------------
+  pdf.setTextColor(...safeColor(colors.primary));
+  pdf.setFont('Times', 'bold');
   pdf.setFontSize(24);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('INVOICE', margin, margin + 45);
+  pdf.text('INVOICE', margin, margin + logoHeight + 15);
 
-  // Invoice details box
-  const infoBoxY = margin + 55;
-  pdf.setDrawColor(...colors.border);
+  // ------------------------------------------------
+  // Invoice Information Box
+  // ------------------------------------------------
+  const infoBoxY = margin + logoHeight + 25;
+  pdf.setDrawColor(...safeColor(colors.border));
   pdf.setLineWidth(0.1);
-  pdf.rect(margin, infoBoxY, pageWidth - (margin * 2), 40);
-
-  // Invoice information
+  pdf.rect(margin, infoBoxY, pageWidth - (margin * 2), 30);
+  pdf.setFont('Times', 'normal');
   pdf.setFontSize(10);
-  pdf.setFont('helvetica', 'normal');
-  
+
+  // Compute additional progress metrics if not directly available
+  const totalActualProgress = invoice.totalActualProgress || invoice.progressPercentage; // adjust as needed
+  const lastClaimedProgress = invoice.lastClaimedProgress || invoice.lastClaimedPercentage || 0;
+  const progressToBePaid = invoice.progressToBePaid || (invoice.progressPercentage - lastClaimedProgress);
+
   const infoColumns = [
     [
       ['Invoice No:', invoice.invoiceNumber],
-      ['Date:', invoice.date],
-      ['Due Date:', invoice.dueDate],
-      ['Currency:', invoice.currency || 'USD']
+      ['Project Name:', project.name],
     ],
     [
-      ['Project Ref:', project.id],
-      ['Progress:', `${invoice.progressPercentage}%`],
-      ['Status:', invoice.status],
-      ['Terms:', '30 Days']
+      ['Date:', invoice.date],
+      ['Contract No:', invoice.contractNumber],
     ]
   ];
 
   infoColumns.forEach((column, colIndex) => {
     column.forEach((item, rowIndex) => {
       const x = margin + (colIndex * 85) + 5;
-      const y = infoBoxY + 12 + (rowIndex * 8);
-      
-      pdf.setTextColor(...colors.secondary);
-      pdf.text(item[0], x, y);
-      
+      let y = infoBoxY + 12 + (rowIndex * 10); // Increase spacing to accommodate wrapped lines
+      pdf.setTextColor(...safeColor(colors.secondary));
+      pdf.text(String(item[0]), x, y);
       pdf.setTextColor(0, 0, 0);
-      pdf.text(item[1], x + 35, y);
+      // If the label is "Project Name:", wrap the text
+      if (String(item[0]).trim() === 'Project Name:') {
+        const maxWidth = 50; // set maximum width in mm
+        const wrappedText = pdf.splitTextToSize(String(item[1]), maxWidth);
+        pdf.text(wrappedText, x + 35, y);
+      } else {
+        pdf.text(String(item[1]), x + 35, y);
+      }
     });
   });
 
-  // Client and project information
+  // ------------------------------------------------
+  // Client & Project Details Section
+  // ------------------------------------------------
   const addressY = infoBoxY + 50;
-  
-  pdf.setTextColor(...colors.primary);
+  // Client details on left
+  pdf.setTextColor(...safeColor(colors.primary));
   pdf.setFontSize(10);
   pdf.text('BILL TO', margin, addressY);
-  
   pdf.setTextColor(0, 0, 0);
   pdf.setFontSize(9);
   const clientDetails = [
@@ -120,32 +130,32 @@ export const generateInvoicePDF = (invoice) => {
     `Tel: ${client.phone}`,
     `Email: ${client.email}`
   ];
-  
   clientDetails.forEach((detail, index) => {
-    pdf.text(detail, margin, addressY + 10 + (index * 5));
+    pdf.text(String(detail), margin, addressY + 7 + (index * 5));
   });
 
-  // Project details
-  pdf.setTextColor(...colors.primary);
-  pdf.text('PROJECT DETAILS', pageWidth - margin - 80, addressY);
-  
+  // Project details on right
+  pdf.setTextColor(...safeColor(colors.primary));
+  pdf.text('PROJECT DETAILS', pageWidth / 2 + 10, addressY);
   pdf.setTextColor(0, 0, 0);
   const projectDetails = [
-    project.name,
-    `Start Date: ${project.startDate}`,
-    `End Date: ${project.endDate}`,
-    `Total Amount: ${formatCurrency(project.totalAmount, invoice.currency)}`
+    `Total Actual Progress: ${invoice.progressPercentage}%`,
+    `Cutoff Date: ${invoice.cutOffDate}`,
+    `Last Claimed Progress: ${lastClaimedProgress}%`,
+    `Progress to be Paid: ${progressToBePaid}%`,
+    `Total Project Amount: ${formatCurrency(project.totalAmount, invoice.currency)}`
   ];
-  
   projectDetails.forEach((detail, index) => {
-    pdf.text(detail, pageWidth - margin - 80, addressY + 10 + (index * 5));
+    pdf.text(String(detail), pageWidth / 2 + 10, addressY + 7 + (index * 5));
   });
 
-  // Line items table
-  const tableY = addressY + 60;
-  
+  // ------------------------------------------------
+  // Line Items Table
+  // ------------------------------------------------
+  const tableY = addressY + 35;
   autoTable(pdf, {
     startY: tableY,
+    margin: { left: margin, right: margin },
     head: [['Description', 'Amount', 'Deduction', 'Retention', 'Net Amount']],
     body: invoice.lineItems.map(item => [
       item.description,
@@ -157,38 +167,45 @@ export const generateInvoicePDF = (invoice) => {
     theme: 'grid',
     styles: {
       fontSize: 9,
-      cellPadding: 5,
-      lineColor: colors.border,
-      lineWidth: 0.1
+      cellPadding: 4,
+      lineColor: safeColor(colors.border),
+      lineWidth: 0.1,
+      halign: 'center'
     },
     headStyles: {
-      fillColor: colors.primary[0],
-      textColor: 255,
-      fontStyle: 'bold'
+      fillColor: safeColor(colors.primary),
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      halign: 'center'
+    },
+    bodyStyles: {
+      halign: 'center'
     },
     columnStyles: {
-      0: { cellWidth: 80 },
-      1: { cellWidth: 30, halign: 'right' },
-      2: { cellWidth: 30, halign: 'right' },
-      3: { cellWidth: 30, halign: 'right' },
-      4: { cellWidth: 30, halign: 'right' }
+      0: { cellWidth: 60, halign: 'left' },
+      1: { cellWidth: 30 },
+      2: { cellWidth: 30 },
+      3: { cellWidth: 30 },
+      4: { cellWidth: 30 }
     },
     alternateRowStyles: {
       fillColor: [250, 250, 250]
     }
   });
 
-  // Summary box
+  // ------------------------------------------------
+  // Summary Section (smaller)
+  // ------------------------------------------------
   const finalY = pdf.lastAutoTable.finalY + 10;
-  
-  pdf.setDrawColor(...colors.border);
+  // Reduced summary box dimensions: width = 70, height = 50
+  pdf.setDrawColor(...safeColor(colors.border));
   pdf.setFillColor(250, 250, 250);
-  pdf.rect(pageWidth - margin - 85, finalY, 85, 70, 'FD');
+  pdf.rect(pageWidth - margin - 70, finalY, 70, 50, 'FD');
 
-  pdf.setTextColor(...colors.primary);
-  pdf.setFontSize(10);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('SUMMARY', pageWidth - margin - 80, finalY + 10);
+  pdf.setTextColor(...safeColor(colors.primary));
+  pdf.setFontSize(9);
+  pdf.setFont('Times', 'bold');
+  pdf.text('SUMMARY', pageWidth - margin - 65, finalY + 8);
 
   const summaryItems = [
     ['Subtotal:', invoice.currentInvoiceAmount],
@@ -196,112 +213,69 @@ export const generateInvoicePDF = (invoice) => {
     ['Retentions:', invoice.retentions],
     ['Total:', invoice.currentInvoiceAmount - invoice.deductions - invoice.retentions]
   ];
-
   summaryItems.forEach(([label, amount], i) => {
-    const y = finalY + 25 + (i * 12);
-    const isTotal = i === summaryItems.length - 1;
-
-    if (isTotal) {
-      pdf.setDrawColor(...colors.border);
-      pdf.line(pageWidth - margin - 80, y - 4, pageWidth - margin - 5, y - 4);
+    const y = finalY + 20 + (i * 10);
+    if (i === summaryItems.length - 1) {
+      pdf.setDrawColor(...safeColor(colors.border));
+      pdf.line(pageWidth - margin - 65, y - 3, pageWidth - margin - 5, y - 3);
     }
-
-    pdf.setTextColor(...(isTotal ? colors.primary : colors.secondary));
-    pdf.setFont('helvetica', isTotal ? 'bold' : 'normal');
-    pdf.setFontSize(9);
-    
-    pdf.text(label, pageWidth - margin - 80, y);
-    pdf.text(
-      formatCurrency(amount, invoice.currency),
-      pageWidth - margin - 5,
-      y,
-      { align: 'right' }
-    );
+    pdf.setTextColor(...(i === summaryItems.length - 1 ? safeColor(colors.primary) : safeColor(colors.secondary)));
+    pdf.setFont('Times', i === summaryItems.length - 1 ? 'bold' : 'normal');
+    pdf.setFontSize(8);
+    pdf.text(label, pageWidth - margin - 65, y);
+    pdf.text(formatCurrency(amount, invoice.currency), pageWidth - margin - 5, y, { align: 'right' });
   });
 
-  // Amount in words
-  const amountInWords = convertAmountToWords(
-    invoice.currentInvoiceAmount - invoice.deductions - invoice.retentions,
-    invoice.currency
-  );
-  
-  pdf.setTextColor(...colors.primary);
+  // ------------------------------------------------
+  // Amount in Words Section
+  // ------------------------------------------------
+  const amountInWords = convertAmountToWords(invoice.currentInvoiceAmount - invoice.deductions - invoice.retentions, invoice.currency);
+  pdf.setTextColor(...safeColor(colors.primary));
   pdf.setFontSize(10);
   pdf.text('Amount in Words:', margin, finalY + 10);
-  
   pdf.setTextColor(0, 0, 0);
   pdf.setFontSize(9);
-  const wrappedAmountInWords = pdf.splitTextToSize(amountInWords, pageWidth - (margin * 2) - 90);
-  wrappedAmountInWords.forEach((line, index) => {
+  const wrappedAmount = pdf.splitTextToSize(amountInWords, pageWidth - (margin * 2) - 90);
+  wrappedAmount.forEach((line, index) => {
     pdf.text(line, margin, finalY + 20 + (index * 5));
   });
 
-  // Payment instructions
-  pdf.setTextColor(...colors.primary);
+  // ------------------------------------------------
+  // Payment Instructions Section
+  // ------------------------------------------------
+  pdf.setTextColor(...safeColor(colors.primary));
+  pdf.setFont('Times', 'bold');
   pdf.setFontSize(10);
-  pdf.setFont('helvetica', 'bold');
   pdf.text('Payment Instructions', margin, finalY + 45);
 
   const selectedBank = company.bankAccounts?.find(acc => acc.currency === invoice.currency) || company.bankAccounts?.[0];
-  
   if (selectedBank) {
     pdf.setTextColor(0, 0, 0);
+    pdf.setFont('Times', 'normal');
     pdf.setFontSize(9);
-    pdf.setFont('helvetica', 'normal');
-    
     const bankDetails = [
-      'Please make payment via bank transfer to:',
+      'Please transfer via bank transfer to:',
       `Bank: ${selectedBank.bankName}`,
       `Account: ${selectedBank.accountNumber}`,
       `SWIFT: ${selectedBank.swiftCode}`,
       `IBAN: ${selectedBank.iban}`,
-      'Please quote invoice number as payment reference'
     ];
-    
     bankDetails.forEach((detail, index) => {
       pdf.text(detail, margin, finalY + 55 + (index * 5));
     });
   }
 
-  // Terms and conditions
-  if (invoice.notes) {
-    pdf.setTextColor(...colors.primary);
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Terms & Conditions', margin, pageHeight - 60);
-    
-    pdf.setTextColor(0, 0, 0);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(8);
-    const wrappedNotes = pdf.splitTextToSize(invoice.notes, pageWidth - (margin * 2));
-    wrappedNotes.forEach((line, index) => {
-      if (index < 4) { // Limit to 4 lines to avoid overflow
-        pdf.text(line, margin, pageHeight - 50 + (index * 5));
-      }
-    });
-  }
 
-  // Footer
-  pdf.setFillColor(245, 245, 245);
+
+  // ------------------------------------------------
+  // Footer Section
+  // ------------------------------------------------
+  pdf.setFillColor(...safeColor(colors.lightGray));
   pdf.rect(0, pageHeight - 20, pageWidth, 20, 'F');
-
-  pdf.setTextColor(...colors.secondary);
+  pdf.setTextColor(...safeColor(colors.secondary));
   pdf.setFontSize(8);
-  pdf.text(
-    `${company.name} | Reg No: ${company.id} | VAT No: ${company.id}`,
-    pageWidth / 2,
-    pageHeight - 10,
-    { align: 'center' }
-  );
-
-  // Page numbers
-  pdf.setFontSize(8);
-  pdf.text(
-    `Page 1 of 1`,
-    pageWidth - margin,
-    pageHeight - 10,
-    { align: 'right' }
-  );
+  pdf.text(`${company.name} | Reg No: ${company.id} | VAT No: ${company.id}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+  pdf.text('Page 1 of 1', pageWidth - margin, pageHeight - 10, { align: 'right' });
 
   return pdf;
 };
