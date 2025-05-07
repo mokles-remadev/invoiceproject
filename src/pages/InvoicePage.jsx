@@ -25,7 +25,8 @@ const InvoicePage = () => {
     selectedInvoice, 
     addInvoice, 
     updateInvoice, 
-    clearSelectedInvoice 
+    clearSelectedInvoice,
+    selectInvoice
   } = useInvoices();
 
   const handleCreateClick = () => {
@@ -40,7 +41,7 @@ const InvoicePage = () => {
   const handleViewClick = (invoice) => {
     if (invoice) {
       setCurrentView(View.DETAILS);
-      selectedInvoice(invoice); // Update the selected invoice in the context
+      selectInvoice(invoice.id); // Use the correct function to update the selected invoice
     } else {
       message.error('No invoice selected');
     }
