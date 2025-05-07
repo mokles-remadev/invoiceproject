@@ -44,24 +44,22 @@ export const InvoiceProvider = ({ children }) => {
     }
   };
 
-  const clearSelectedInvoice = () => {
-    setSelectedInvoice(null);
+  const clearSelectedInvoice = () => setSelectedInvoice(null);
+
+  const value = {
+    invoices,
+    selectedInvoice,
+    filteredStatus,
+    addInvoice,
+    updateInvoice,
+    deleteInvoice,
+    selectInvoice,
+    clearSelectedInvoice,
+    setFilteredStatus,
   };
 
   return (
-    <InvoiceContext.Provider
-      value={{
-        invoices,
-        selectedInvoice,
-        filteredStatus,
-        addInvoice,
-        updateInvoice,
-        deleteInvoice,
-        selectInvoice,
-        clearSelectedInvoice,
-        setFilteredStatus,
-      }}
-    >
+    <InvoiceContext.Provider value={value}>
       {children}
     </InvoiceContext.Provider>
   );

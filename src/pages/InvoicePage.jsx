@@ -38,7 +38,12 @@ const InvoicePage = () => {
   };
 
   const handleViewClick = (invoice) => {
-    setCurrentView(View.DETAILS);
+    if (invoice) {
+      setCurrentView(View.DETAILS);
+      selectedInvoice(invoice); // Update the selected invoice in the context
+    } else {
+      message.error('No invoice selected');
+    }
   };
 
   const handleFormSubmit = (invoice) => {
@@ -85,7 +90,7 @@ const InvoicePage = () => {
         return (
           <InvoiceList 
             onEdit={handleEditClick} 
-            onView={handleViewClick} 
+            onView={(invoice) => handleViewClick(invoice)} 
           />
         );
     }
